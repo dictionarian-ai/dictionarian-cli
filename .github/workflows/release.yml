@@ -1,0 +1,61 @@
+name: Release CLI
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - runner: macos-15
+            target: darwin-arm64
+          - runner: macos-15-intel
+            target: darwin-x86_64
+          - runner: ubuntu-24.04
+            target: linux-x86_64
+          - runner: ubuntu-24.04-arm
+            target: linux-arm64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -e '.[all-databases,dev]'
+      - run: pyinstaller packaging/dictionarian.spec --noconfirm
+      - run: tar -czf "dictionarian-${GITHUB_REF_NAME}-${{ matrix.target }}.tar.gz" -C dist dictionarian
+      - uses: anchore/sbom-action@v0
+        with:
+          path: dist/dictionarian
+          output-file: dictionarian-${{ matrix.target }}.spdx.json
+          upload-artifact: false
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dictionarian-${{ matrix.target }}
+          path: |
+            dictionarian-*.tar.gz
+            dictionarian-${{ matrix.target }}.spdx.json
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: dictionarian-*
+          merge-multiple: true
+      - run: sha256sum dictionarian-*.tar.gz > SHA256SUMS
+      - uses: sigstore/cosign-installer@v3
+      - run: |
+          for archive in dictionarian-*.tar.gz; do
+            cosign sign-blob --yes "$archive" --bundle "$archive.sigstore.json"
+          done
+      - run: gh release create "$GITHUB_REF_NAME" --verify-tag --generate-notes dictionarian-*.tar.gz *.spdx.json SHA256SUMS *.sigstore.json
+        env:
+          GH_TOKEN: ${{ github.token }}
