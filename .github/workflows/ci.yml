@@ -1,5 +1,8 @@
 name: CI
 
+env:
+  DICTIONARIAN_CORE_REF: ac67a545763407cd53a1f33d7773992ae3b20414
+
 on:
   pull_request:
   push:
@@ -17,7 +20,8 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
           cache: pip
-      - run: pip install -e '.[dev]'
+      - run: >-
+          pip install -e '.[dev]'
+          "dictionarian-ai @ git+https://github.com/dictionarian-ai/dictionarian-ai.git@${DICTIONARIAN_CORE_REF}"
       - run: ruff check .
       - run: pytest --cov=dictionarian_cli --cov-report=term-missing
-

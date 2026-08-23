@@ -1,5 +1,8 @@
 name: Release CLI
 
+env:
+  DICTIONARIAN_CORE_REF: ac67a545763407cd53a1f33d7773992ae3b20414
+
 on:
   push:
     tags: ['v*']
@@ -27,7 +30,9 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - run: pip install -e '.[all-databases,dev]'
+      - run: >-
+          pip install -e '.[all-databases,dev]'
+          "dictionarian-ai[postgres,mssql,redshift] @ git+https://github.com/dictionarian-ai/dictionarian-ai.git@${DICTIONARIAN_CORE_REF}"
       - run: pyinstaller packaging/dictionarian.spec --noconfirm
       - run: tar -czf "dictionarian-${GITHUB_REF_NAME}-${{ matrix.target }}.tar.gz" -C dist dictionarian
       - uses: anchore/sbom-action@v0
